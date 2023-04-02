@@ -1,0 +1,22 @@
+[package]
+name = "smarther-mqtt-bridge"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+actix-web = "4.3.1"
+anyhow = "1.0.70"
+clap = { version = "4.2.1", features = ["derive"] }
+futures = "0.3.28"
+smarther = { git = "https://github.com/artumino/smarther-rs.git", version = "0.1.2", features = ["web"] }
+serde = { version = "1.0.159", features = ["derive"] }
+serde_json = "1.0.95"
+tokio = { version = "1.27.0", features = ["rt", "macros", "fs", "io-util", "rt-multi-thread", "sync"] }
+tokio-util = "0.7.7"
+async-channel = "1.8.0"
+rumqttc = "0.20.0"
+bytes = "1.4.0"
+log = "0.4.17"
+env_logger = "0.10.0"

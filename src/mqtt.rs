@@ -52,15 +52,21 @@ async fn try_update_plant_status(context: &Context, topic: &str, payload: &Bytes
 
 async fn mqtt_command_handler(context: &Context, mqtt_loop: &mut rumqttc::EventLoop) {
     loop {
-        while let Ok(event) = mqtt_loop.poll().await {
+        let mut mqtt_event = mqtt_loop.poll().await;
+        while let Ok(event) = &mqtt_event {
             if let Incoming(Packet::Publish(Publish { topic, payload, .. })) = event {
-               if let Err(err) = try_update_plant_status(context, &topic, &payload).await {
+               if let Err(err) = try_update_plant_status(context, topic, payload).await {
                    error!("Error while updating plant status: {}", err);
                }
             }
+
+            mqtt_event = mqtt_loop.poll().await;
         }
         // Reconnect timeout
         warn!("MQTT connection lost, reconnecting in 5 seconds...");
+        if let Err(err) = &mqtt_event {
+            warn!("MQTT Reported Error: {}", err);
+        }
         tokio::time::sleep(Duration::from_millis(5000)).await;
     }
 }

@@ -87,6 +87,10 @@ struct BridgeConfiguration {
     mqtt_username: String,
     #[serde(default = "BridgeConfiguration::default_mqtt_password")]
     mqtt_password: String,
+    #[serde(default = "BridgeConfiguration::default_listen_port")]
+    listen_port: u16,
+    #[serde(default = "BridgeConfiguration::default_listen_host")]
+    listen_host: String,
 }
 
 impl Default for BridgeConfiguration {
@@ -97,7 +101,9 @@ impl Default for BridgeConfiguration {
             mqtt_broker: BridgeConfiguration::default_mqtt_broker(), 
             mqtt_port: BridgeConfiguration::default_mqtt_port(), 
             mqtt_username: BridgeConfiguration::default_mqtt_username(), 
-            mqtt_password: BridgeConfiguration::default_mqtt_password() 
+            mqtt_password: BridgeConfiguration::default_mqtt_password(),
+            listen_port: BridgeConfiguration::default_listen_port(),
+            listen_host: BridgeConfiguration::default_listen_host()
         }
     }
 }
@@ -121,6 +127,14 @@ impl BridgeConfiguration {
     
     fn default_mqtt_password() -> String {
         "".to_string()
+    }
+
+    fn default_listen_port() -> u16 {
+        8080
+    }
+
+    fn default_listen_host() -> String {
+        "localhost".to_string()
     }
 }
 
@@ -153,7 +167,7 @@ async fn main() -> anyhow::Result<()> {
 
     match &args.command {
         Commands::Setup { setup_args } => {
-            setup(setup_args, &auth_file, &plant_topology_file).await?;
+            setup(setup_args, &auth_file, &plant_topology_file, &configuration_file).await?;
             
         },
         _ => {
@@ -164,15 +178,21 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn setup(setup_args: &SetupArgs, auth_file: &str, topology_file: &str) -> anyhow::Result<()> {
+async fn setup(setup_args: &SetupArgs, auth_file: &str, topology_file: &str, configuration_file: &str) -> anyhow::Result<()> {
     let client = SmartherApi::default();
-    
+
+    let configuration = if let Ok(configuration_content) = std::fs::read_to_string(configuration_file) {
+        serde_json::from_str(&configuration_content)?
+    } else {
+        BridgeConfiguration::default()
+    };
+
     let auth_info = if let Ok(auth_info) = load_auth_info(auth_file) {
         auth_info
     } else { 
         match setup_args {
             SetupArgs{ client_id: Some(client_id), client_secret: Some(client_secret), subkey: Some(subkey), base_uri } => {
-                let auth_info = client.get_oauth_access_code(client_id, client_secret, base_uri.as_deref(), subkey).await?;
+                let auth_info = client.get_oauth_access_code(client_id, client_secret, base_uri.as_deref(), subkey, (&configuration.listen_host, configuration.listen_port)).await?;
                 let auth_info_json = serde_json::to_string_pretty(&auth_info)?;
                 std::fs::write(auth_file, auth_info_json)?;
                 auth_info
@@ -233,10 +253,10 @@ async fn run(auth_file: String, topology_file: String, subscriptions_file: Strin
 
     let cancellation_token = CancellationToken::new();
     tokio::join!(
+        interrupt_handler(cancellation_token.clone()),
         webhook_handler(&context, cancellation_token.clone()),
         mqtt_handler(&context, cancellation_token.clone()),
-        token_refresher(&context, cancellation_token.clone()),
-        interrupt_handler(cancellation_token.clone())
+        token_refresher(&context, cancellation_token.clone())
     );
 
     Ok(())

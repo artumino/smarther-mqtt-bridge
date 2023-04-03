@@ -1,0 +1,15 @@
+version: "3.4"
+services:
+  smarther-mqtt-bridge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: smarther-mqtt-bridge
+    restart: always
+    environment:
+      - SMARTHER_CONFIG_DIR=/config
+      - RUST_LOG=info
+    volumes:
+      - ./config:/config
+    ports:
+      - 8080:23785

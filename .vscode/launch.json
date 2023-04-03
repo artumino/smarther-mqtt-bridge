@@ -21,7 +21,9 @@
             },
             "args": ["run"],
             "env": {
-                "RUST_LOG": "debug"
+                "RUST_LOG": "debug",
+                "RUST_BACKTRACE": "1",
+                "SMARTHER_CONFIG_DIR": "./config"
             },
             "cwd": "${workspaceFolder}"
         },
@@ -43,7 +45,9 @@
             },
             "args": [],
             "env": {
-                "RUST_LOG": "debug"
+                "RUST_LOG": "debug",
+                "RUST_BACKTRACE": "1",
+                "SMARTHER_CONFIG_DIR": "./config"
             },
             "cwd": "${workspaceFolder}"
         }

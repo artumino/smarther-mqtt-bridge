@@ -1,0 +1,10 @@
+/target
+/config
+.vscode
+*.json
+Dockerfile
+.dockerignore
+.gitignore
+.git
+docker-compose.yml
+LICENSE

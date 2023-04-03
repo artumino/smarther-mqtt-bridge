@@ -14,6 +14,8 @@ async fn process(path: web::Path<String>, context: Data<(Vec<String>, Sender<Mod
         return "Plant not active";
     }
 
+    info!("Received status update for plant {}", plant_id);
+
     let tx = context.1.clone();
     if tx.send(payload.0).await.is_err() {
         error!("Failed to send status update to MQTT handler");
@@ -68,6 +70,8 @@ async fn handle_subscriptions(context: &Context, cancellation_token: Cancellatio
         error!("Failed to register any webhook");
         return;
     }
+
+    info!("Registered webhooks for {} plants", active_subscriptions.len());
 
     //Wait for end
     cancellation_token.cancelled().await;
@@ -124,6 +128,7 @@ async fn http_server(context: &Context, cancellation_token: CancellationToken) {
     let sender = context.status_updates.0.clone();
     let listen_host: &str = &context.configuration.listen_host;
     let listen_port: u16 = context.configuration.listen_port;
+    info!("Starting webhook server on {}:{}", listen_host, listen_port);
     if let Ok(server) = HttpServer::new(move || {
         App::new()
             .app_data(Data::new((active_plants.clone(), sender.clone())))

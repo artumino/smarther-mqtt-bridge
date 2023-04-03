@@ -1,4 +1,5 @@
 FROM rust:latest AS builder
+ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 RUN update-ca-certificates
 WORKDIR /smarther-mqtt-bridge
 COPY ./ .

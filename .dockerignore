@@ -1,5 +1,5 @@
-/target
-/config
+target
+config
 .vscode
 *.json
 Dockerfile

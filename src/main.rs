@@ -145,7 +145,7 @@ fn load_auth_info(auth_file: &str) -> anyhow::Result<AuthorizationInfo> {
 async fn refresh_token_if_needed(client: &SmartherApi<Unauthorized>, auth_info: AuthorizationInfo, auth_file: &str) -> anyhow::Result<AuthorizationInfo> {
     if auth_info.is_refresh_needed() {
         let refreshed_auth_info = client.refresh_token(&auth_info).await?;
-        let refreshed_auth_info_json = serde_json::to_string_pretty(&auth_info)?;
+        let refreshed_auth_info_json = serde_json::to_string_pretty(&refreshed_auth_info)?;
         std::fs::write(auth_file, refreshed_auth_info_json)?;
         return Ok(refreshed_auth_info);
     }
@@ -160,7 +160,6 @@ async fn main() -> anyhow::Result<()> {
     let config_dir = env::var("SMARTHER_CONFIG_DIR").unwrap_or_else(|_| current_dir().unwrap().to_string_lossy().into());
     let auth_file = format!("{}/tokens.json", config_dir);
     let plant_topology_file = format!("{}/plant_topology.json", config_dir);
-    let subscriptions_file = format!("{}/subscriptions.json", config_dir);
     let configuration_file = format!("{}/configuration.json", config_dir);
 
     match &args.command {
@@ -169,7 +168,7 @@ async fn main() -> anyhow::Result<()> {
             
         },
         _ => {
-            run(auth_file, plant_topology_file, subscriptions_file, configuration_file).await?;
+            run(auth_file, plant_topology_file, configuration_file).await?;
         }
     }
 
@@ -217,7 +216,7 @@ async fn setup(setup_args: &SetupArgs, auth_file: &str, topology_file: &str, con
     Ok(())
 }
 
-async fn run(auth_file: String, topology_file: String, subscriptions_file: String, configuration_file: String) -> anyhow::Result<()> {
+async fn run(auth_file: String, topology_file: String, configuration_file: String) -> anyhow::Result<()> {
     let auth_info = RefCell::new(load_auth_info(&auth_file)?);
     let topology_cache = std::fs::read_to_string(&topology_file)?;
     let topology_cache: CachedTopology = serde_json::from_str(&topology_cache)?;
@@ -254,6 +253,10 @@ async fn run(auth_file: String, topology_file: String, subscriptions_file: Strin
 }
 
 async fn interrupt_handler(cancellation_token: CancellationToken) {
-    tokio::signal::ctrl_c().await.unwrap();
-    cancellation_token.cancel();
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => {
+            cancellation_token.cancel();
+        },
+        _ = cancellation_token.cancelled() => {}
+    }
 }

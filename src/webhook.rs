@@ -134,5 +134,7 @@ async fn http_server(context: &Context, cancellation_token: CancellationToken) {
             _ = cancellation_token.cancelled() => {},
             _ = server.run() => {}
         }
+
+        cancellation_token.cancel();
     }
 }

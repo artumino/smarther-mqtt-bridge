@@ -35,11 +35,7 @@ pub(crate) async fn webhook_handler(context: &Context, cancellation_token: Cance
 }
 
 async fn handle_subscriptions(context: &Context, cancellation_token: CancellationToken) {
-    let mut active_subscriptions = context.active_subscriptions.clone();
-
-    if !active_subscriptions.is_empty() {
-        active_subscriptions = clear_active_subscriptions(context, active_subscriptions).await;
-    }
+    let mut active_subscriptions = clear_active_subscriptions(context, None).await;
 
     if context.refresh_token_if_needed().await.is_err() {
         error!("Failed to refresh token");
@@ -63,7 +59,9 @@ async fn handle_subscriptions(context: &Context, cancellation_token: Cancellatio
             error!("Failed to register webhook for plant {}: {}", plant_id, subscription_info.err().unwrap());
             continue;
         }
-        active_subscriptions.push(subscription_info.unwrap());
+        let mut subscription = subscription_info.unwrap();
+        subscription.plant_id = Some(plant_id);
+        active_subscriptions.push(subscription);
     }
 
     if active_subscriptions.is_empty() {
@@ -71,18 +69,16 @@ async fn handle_subscriptions(context: &Context, cancellation_token: Cancellatio
         return;
     }
 
-    std::fs::write(&context.subscriptions_file, serde_json::to_string_pretty(&active_subscriptions).unwrap()).unwrap();
-
     //Wait for end
     cancellation_token.cancelled().await;
 
     info!("Unregistering webhooks...");
 
     //Remove all subscriptions
-    clear_active_subscriptions(context, active_subscriptions).await;
+    clear_active_subscriptions(context, Some(active_subscriptions)).await;
 }
 
-async fn clear_active_subscriptions(context: &Context, active_subscriptions: Vec<smarther::model::SubscriptionInfo>) -> Vec<smarther::model::SubscriptionInfo> {
+async fn clear_active_subscriptions(context: &Context, active_subscriptions: Option<Vec<smarther::model::SubscriptionInfo>>) -> Vec<smarther::model::SubscriptionInfo> {
     if context.refresh_token_if_needed().await.is_err() {
         error!("Failed to refresh token");
         return vec!();
@@ -96,6 +92,18 @@ async fn clear_active_subscriptions(context: &Context, active_subscriptions: Vec
     }
 
     let client = auth_request.unwrap();
+    //FIXME: Right now we cancel all subscriptions, even if they are not related to this bridge
+    let active_subscriptions = match active_subscriptions {
+        Some(subscriptions) => subscriptions,
+        None => {
+            if let Ok(subscriptions) = client.get_webhooks().await {
+                subscriptions
+            } else {
+                vec!()
+            }
+        }
+    };
+
     let mut remaining_subscriptions = vec!();
     for subscription in &active_subscriptions {
         if let Some(plant_id) = &subscription.plant_id {
@@ -107,8 +115,6 @@ async fn clear_active_subscriptions(context: &Context, active_subscriptions: Vec
         }
     }
 
-    std::fs::write(&context.subscriptions_file, serde_json::to_string_pretty(&remaining_subscriptions).unwrap()).unwrap();
-    
     remaining_subscriptions
 }
 

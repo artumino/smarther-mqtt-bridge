@@ -5,7 +5,7 @@ use anyhow::anyhow;
 use clap::{Subcommand, Parser, Args};
 use async_channel::{Receiver, Sender};
 use log::info;
-use smarther::{model::{PlantDetail, ModuleStatus, SubscriptionInfo}, AuthorizationInfo, SmartherApi, states::{Unauthorized}};
+use smarther::{model::{PlantDetail, ModuleStatus}, AuthorizationInfo, SmartherApi, states::{Unauthorized}};
 use tokio_util::sync::CancellationToken;
 
 use crate::{token_watchdog::token_refresher, mqtt::mqtt_handler, webhook::webhook_handler};
@@ -50,11 +50,9 @@ struct Context {
     configuration: BridgeConfiguration,
     topology_cache: CachedTopology,
     auth_info: RefCell<AuthorizationInfo>,
-    active_subscriptions: Vec<SubscriptionInfo>,
     reset_refresh_watchdog: (Sender<()>, Receiver<()>),
     status_updates: (Sender<ModuleStatus>, Receiver<ModuleStatus>),
     auth_file: String,
-    subscriptions_file: String,
 }
 
 impl Context {
@@ -223,11 +221,6 @@ async fn run(auth_file: String, topology_file: String, subscriptions_file: Strin
     let auth_info = RefCell::new(load_auth_info(&auth_file)?);
     let topology_cache = std::fs::read_to_string(&topology_file)?;
     let topology_cache: CachedTopology = serde_json::from_str(&topology_cache)?;
-    let active_subscriptions = if let Ok(subscription_content) = std::fs::read_to_string(&subscriptions_file) {
-        serde_json::from_str(&subscription_content)?
-    } else {
-        vec!()
-    };
 
     let configuration = if let Ok(configuration_content) = std::fs::read_to_string(&configuration_file) {
         serde_json::from_str(&configuration_content)?
@@ -243,12 +236,10 @@ async fn run(auth_file: String, topology_file: String, subscriptions_file: Strin
     let context = Context {
         configuration,
         topology_cache,
-        active_subscriptions,
         auth_info,
         reset_refresh_watchdog: async_channel::bounded(1),
         status_updates: async_channel::unbounded(),
-        auth_file,
-        subscriptions_file
+        auth_file
     };
 
     let cancellation_token = CancellationToken::new();

@@ -1,6 +1,6 @@
-use actix_web::{post, web::{Data, self}, HttpServer, App};
+use actix_web::{post, web::{Data, self}, HttpServer, App, error, HttpResponse};
 use async_channel::Sender;
-use log::{error, warn, info};
+use log::{error, warn, info, debug};
 use smarther::{model::ModuleStatus, SmartherApi};
 use tokio_util::sync::CancellationToken;
 
@@ -129,9 +129,17 @@ async fn http_server(context: &Context, cancellation_token: CancellationToken) {
     let listen_host: &str = &context.configuration.listen_host;
     let listen_port: u16 = context.configuration.listen_port;
     info!("Starting webhook server on {}:{}", listen_host, listen_port);
+
+    let json_cfg = web::JsonConfig::default()
+        .error_handler(|err, _req| {
+            debug!("Failed to parse JSON: {}", err);
+            error::InternalError::from_response(err, HttpResponse::Conflict().into()).into()
+        });
+
     if let Ok(server) = HttpServer::new(move || {
         App::new()
             .app_data(Data::new((active_plants.clone(), sender.clone())))
+            .app_data(json_cfg.clone())
             .service(process)
     })
     .bind((listen_host, listen_port)) {

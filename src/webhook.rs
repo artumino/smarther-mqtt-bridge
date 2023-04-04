@@ -1,4 +1,4 @@
-use actix_web::{post, web::{Data, self}, HttpServer, App, error, HttpResponse};
+use actix_web::{post, web::{Data, self}, HttpServer, App, error, HttpResponse, middleware::Logger};
 use async_channel::Sender;
 use log::{error, warn, info, debug};
 use smarther::{model::ModuleStatus, SmartherApi};
@@ -140,6 +140,8 @@ async fn http_server(context: &Context, cancellation_token: CancellationToken) {
         App::new()
             .app_data(Data::new((active_plants.clone(), sender.clone())))
             .app_data(json_cfg.clone())
+            .wrap(Logger::default())
+            .wrap(Logger::new("%a %D %r %{User-Agent}i"))
             .service(process)
     })
     .bind((listen_host, listen_port)) {

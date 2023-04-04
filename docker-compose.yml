@@ -12,4 +12,4 @@ services:
     volumes:
       - ./config:/config
     ports:
-      - 8080:23785
+      - 8080:8080

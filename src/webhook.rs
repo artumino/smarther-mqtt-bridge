@@ -1,13 +1,13 @@
 use actix_web::{post, web::{Data, self}, HttpServer, App, error, HttpResponse, middleware::Logger};
 use async_channel::Sender;
 use log::{error, warn, info, debug};
-use smarther::{model::ModuleStatus, SmartherApi};
+use smarther::{model::{ModuleStatus, C2CEvents}, SmartherApi};
 use tokio_util::sync::CancellationToken;
 
 use crate::Context;
 
 #[post("/smarther_bridge/{id}")]
-async fn process(path: web::Path<String>, context: Data<(Vec<String>, Sender<ModuleStatus>)>, payload: web::Json<ModuleStatus>) -> &'static str {
+async fn process(path: web::Path<String>, context: Data<(Vec<String>, Sender<ModuleStatus>)>, payload: web::Json<C2CEvents>) -> &'static str {
     let plant_id = path.into_inner();
     let is_active_plant = context.0.iter().any(|sub| sub == &plant_id);
     if !is_active_plant {
@@ -17,8 +17,10 @@ async fn process(path: web::Path<String>, context: Data<(Vec<String>, Sender<Mod
     info!("Received status update for plant {}", plant_id);
 
     let tx = context.1.clone();
-    if tx.send(payload.0).await.is_err() {
-        error!("Failed to send status update to MQTT handler");
+    for event in payload.0 {
+        if tx.send(event.data).await.is_err() {
+            error!("Failed to send status update to MQTT handler");
+        }
     }
     "OK"
 }

@@ -3,7 +3,7 @@ use std::time::Duration;
 use bytes::Bytes;
 use log::{info, error, warn};
 use rumqttc::{MqttOptions, Event::Incoming, Publish, Packet, QoS};
-use smarther::{model::{SetStatusRequest, TimedMeasurement, Measurement, ThermostatFunction, ThermostatMode, ThermostatStatus}, SmartherApi};
+use smarther::{model::{SetStatusRequest, TimedMeasurement, Measurement, ThermostatFunction, ThermostatMode, ThermostatStatus, LoadState}, SmartherApi};
 use tokio_util::sync::CancellationToken;
 use anyhow::anyhow;
 
@@ -76,6 +76,7 @@ struct MeasurementSummary {
     temperature: Option<TimedMeasurement>,
     humidity: Option<TimedMeasurement>,
     set_point: Option<Measurement>,
+    load_state: Option<LoadState>,
     mode: ThermostatMode,
     function: ThermostatFunction,
     time: String,
@@ -95,6 +96,7 @@ async fn try_parse_and_publish_status(context: &Context, status: &ThermostatStat
         temperature: last_temperature.cloned(),
         humidity: last_pressure.cloned(),
         set_point: status.set_point.clone(),
+        load_state: status.load_state.clone(),
         mode: status.mode.clone(),
         function: status.function.clone(),
         time: status.time.to_rfc3339(),
